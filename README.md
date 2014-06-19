@@ -148,7 +148,7 @@ override func viewDidLoad() {
     brain.setup(self.serverStatus)
 }
 ```
-In the viedDidLoad() method, we define the beacon region using the previously defined UUID and the major/minor numbers you chose in the brain section above. The update interface call will update our UILabels to reflect the region we defined. If your brain has a setup method, call it here.
+In the viedDidLoad() method, we define the beacon region using the previously defined UUID and the major/minor numbers you chose in the brain section above. The updateInterface() call will update our UILabels to reflect the region we defined. If your brain has a setup method, call it here.
 
 ```swift
 func updateInterface(){
@@ -158,7 +158,7 @@ func updateInterface(){
     self.identity.text = self.region.identifier
 }
 ```
-Here we simply use the properties we defined for the region to update the user interface.
+Once again, updateInterface() simply uses the properties we defined for the region to update the user interface.
 
 ```swift
 @IBAction func transmitBeacon(sender : UIButton) {
