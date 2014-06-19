@@ -3,9 +3,9 @@
 
 Unlike most i-Products, iBeacon is not a physical device. Rather, it is a bluetooth protocol. It allows a device to transmit a small amount of information to another device when they are in close proximity (20m max) of each other. A good way to look at an iBeacon is as a lighthouse. An Observer first needs to know what direction to look in. Once an observer can see the light, he/she can determine color of the light and the frequency with which it rotates. They can also roughly determine how near/far they are from the source. However, with both iBeacons and lighthouses, the source and observer cannot communicate any further without an external technology. In the case of the lighthouse, a great candidate is a radio. In the case of iBeacons, a great cadidate is PubNub.
 
-By default, the only information an iBeacon can send to an observer is a set of two numbers (the major and minor numbers). The basic idea behind a smart iBeacon is that one might want a beacon to send more information than this limited set to an observer. This is accomplished by using the two numbers provided by an iBeacon with PubNub to allow a device to act as the brains of the beacon. An observer uses the iBeacon's information to subscribe to a PubNub channel to which the "brain" device is listening. That brain device can detect this subscription and initiate complex communication or trigger almost any sort of event.
+By default, the only information an iBeacon can send to an observer is a set of two numbers (the major and minor numbers). The driving idea behind a smart iBeacon is that one usually wants a beacon to send an observer more information than this limited set. This is accomplished by using the two numbers provided by an iBeacon with PubNub to allow a device to act as the brains of the beacon. An observer uses the iBeacon's information to subscribe to a PubNub channel to which the "brain" device is already listening. That brain device can detect this subscription and initiate complex communication or trigger almost any sort of event.
 
-In this tutorial, I will demonstrate how to use an iDevice as both an iBeacon emitter and an iBeacon observer using the programming language Swift. For this example, we will pretend that the iBeacon is being used by a shopkeeper to send daily deals to observer devices running the store's app. The "brain" is an ad server which publishes a deal whenever it detects a new device on the iBeacon's channel. When an observer device gets close enough to an iBeacon, it uses the beacon information to subscribe to the iBeacon's channel, receive the brain's ad, then leave.
+In this tutorial, I will demonstrate how to use an iDevice as both a smart iBeacon emitter and an iBeacon observer using the programming language Swift. For this example, we will pretend that we are shopkeepers trying to send daily deals to customers running the store's app. The "brain" is an ad server which publishes a deal whenever it detects a new device on the iBeacon's designated channel. When an observer device gets close enough to an iBeacon emitter, it uses the beacon's information to subscribe to the iBeacon's channel, receive the brain's ad, then leave the channel.
 
 ###A Simple Ad Server
 In this example, the iOS device emitting the iBeacon will also host the ad server "brain" for that iBeacon. However, this code could easily be implemented on an independent machine. This independence is useful when one device needs to handle events for many iBeacons (and in turn many possible channels) or when the emitter device's only capability is emitting an iBeacon signal.
@@ -77,7 +77,7 @@ func pubnubClient(client: PubNub!, didFailMessageSend message: PNMessage!, withE
 	println(error.description)
 }
 ```
-These methods are one again delegate methods. However, they don't update the status label. They merely log message sends/failures on the console.
+These methods are once again delegate methods. However, they don't update the status label. They merely log message sends/failures on the console.
 
 If you wanted to get rid of the logging/label updating, your one beacon brain could function with less than 20 lines of code: 
 
@@ -112,11 +112,11 @@ And there you have it. A simple working iBeacon brain.
 ###The iBeacon Emitter
 Moving onto the beacon itself, we simply define the major and minor numbers, set a unique string that our observers will use to find the beacon, make sure that bluetooth is on, and transmit the beacon signal.
 
-In this example, our emitter's UIView uses 6 labels and a button. The labels are used to display the iBeacon's UUID, Major and Minor ID numbers, it's Identity, our beacon's status, and PubNub's status. The button is used to begin the iBeacon's transmission. We also create a Brain object which receives control when an observer is close enough to a beacon. In addition to the PubNub iOS SDK we will utilize the CoreLocation and CoreBluetooth libraries.
+In this example, our emitter's UIView uses 6 labels and a button. The labels are used to display the iBeacon's UUID, Major and Minor ID numbers, it's Identity, our beacon's status, and PubNub's status. The button is used to begin the iBeacon's transmission. We also create a Brain object which receives control when an observer is close enough to a beacon. To create the iBeacon, we will utilize the CoreLocation and CoreBluetooth libraries.
 
 in our UIViewController, we define the following variables:
 ```swift
-class beViewController: UIViewController, CBPeripheralManagerDelegate {
+class ViewController: UIViewController, CBPeripheralManagerDelegate {
 	// our UIView's label referencing outlets
     @IBOutlet var uuid : UILabel
     @IBOutlet var major : UILabel
@@ -137,7 +137,7 @@ class beViewController: UIViewController, CBPeripheralManagerDelegate {
     var srvr = Server()
 }
 ```
-Once again, remember to include the delegate indication when declaring the class. An observer device is only able to find an iBeacon if it knows the beacon's UUID. You can generate a UUID by using the uuidgen command in terminal. Be sure to use the UUID here and in the observer part of this tutorial.
+Once again, remember to include the delegate indication when declaring the class. An observer device is only able to find an iBeacon if it knows the beacon's UUID. You can generate a UUID by using the uuidgen command in terminal. Be sure to use the UUID here and in the observer part of this tutorial. You should also remember to create the labels on your view and connect them to the outlet objects you define in this section.
 
 ```swift
 override func viewDidLoad() {
@@ -166,13 +166,12 @@ Here we simply use the properties we defined for the region to update the user i
     self.manager = CBPeripheralManager(delegate: self, queue: nil, options: nil)
 }
 ```
-This IBAction function hooks up to our transmit button. The first call designates our NSDictionary as the data backing the beacon. The second defines our blutooth manager with the UIViewController class we just wrote as its delegate. Defining the bluetooth manager allows us to determine what happens when a bluetooth related event occurs. The delegate class must have one mandatory method (which is coincidentally the only one we need).
+This IBAction function hooks up to our transmit button. The first call designates our NSDictionary as the data backing the beacon. The second defines our blutooth manager with the UIViewController class we just wrote as its delegate. Defining the bluetooth manager allows us to determine what happens when a bluetooth related event occurs. The delegate class must have one mandatory method (which is coincidentally the only one we need). One again, remember to connect this function to the button on your view.
 
 ```swift
 func peripheralManagerDidUpdateState(peripheral: CBPeripheralManager!) {
     if(peripheral.state == CBPeripheralManagerState.PoweredOn) {
         println("powered on")
-        println(data)
         self.manager.startAdvertising(data)
         self.beaconStatus.text = "Transmitting!"
     } else if(peripheral.state == CBPeripheralManagerState.PoweredOff) {
@@ -182,4 +181,7 @@ func peripheralManagerDidUpdateState(peripheral: CBPeripheralManager!) {
     }
 }
 ```
-This delegate method is called when the device's bluetooth changes state (including when the manager is defined). 
+This delegate method is called when the device's bluetooth changes state (including when the manager is defined). In addition to updating the beacon status label and outputting some logging messages to consol, it basically advertises the beacon when the device's bluetooth is on and stops advertising when it is off.
+
+Now we've completed the code for the emitter device. Before you test it, remember to make sure your device has an internet connection and that it's bluetooth hardwear is on. Another note is that iBeacons only work on devices equipped with bluetooth 4.0 or higher. In the app, merely wait for the server status to display "ready to transmit" then press the transmit button. Voila, you have a working smart iBeacon emitter.
+
