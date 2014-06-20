@@ -305,8 +305,83 @@ func locationManager(manager: CLLocationManager!, didRangeBeacons beacons: NSArr
 The didRangeBeacons delegate method is called when we have ranged a set of beacons who's regions we are currently occupying. It gives us an array of beacons, but for now we are only looking at one. The first line of the method exists because of our testing call to "startRangingBeacons" so we don't segfault when referencing an empty object. This might occur when we start the app out of range of any beacons. The rest of this method updates the labels to reflect current information about the beacon we are receiving data from. Officially, it can take up to 20 seconds to accurately display beacon information, but in practice it takes about 3. Right now, we hand control over to the customer object when our distance is immediate. It is easier to test the customer object when we reset our state at the "near" distance as opposed to when we leave the beacon's region.
 
 ###The Customer
-Our customer class handles the observer's communication with the emitter beacon's brain. Once it receives control from the view controller, 
+Our customer class handles the observer's communication with the emitter beacon's brain. Once it receives control from the view controller, it uses the information obtained from the iBeacon to subscribe to the channel which the brain is monitoring. Once it receives a message from the brain, the customer displays the contents of the message, in this case an ad/deal, then unsubscribes.
 
+```swift
+class Customer: NSObject, PNDelegate {
+    
+    let config = PNConfiguration(forOrigin: "pubsub.pubnub.com", publishKey: "demo", subscribeKey: "demo", secretKey: nil)
+    
+    var connected = false
+    var deal = UILabel()
+    var pubStatus = UILabel()
+    var needDeal = true
+    var subscribeAttempt = true
+}
+```
+Our customer class maintains control over two labels. One to display the ad it receives from the iBeacon and the other to send status updates. It also requires some state variables to prevent itself from continuously subscribing to the channel and processing messages while within the threshold range of the iBeacon.
 
+```swift
+func setup(deal: UILabel, pubStatus: UILabel) {
+	self.deal = deal
+	self.pubStatus = pubStatus
+	PubNub.setDelegate(self)
+	PubNub.setConfiguration(self.config)
+	PubNub.connect()
+}
+```
+The setup method connects the customer to PubNub and sets itself as the delegate class. It also sets the ad and status update labels.
+
+```swift
+func getAdOfTheDay(major: NSNumber, minor: NSNumber) {
+	if(connected && subscribeAttempt) {
+	subscribeAttempt = false
+	var channel: PNChannel = PNChannel.channelWithName("minor:\(minor)major:\(major)CompanyName", shouldObservePresence: true) as PNChannel
+	PubNub.subscribeOnChannel(channel)
+	} else if (subscribeAttempt) {
+	deal.text =  "connection error :("
+	}
+}
+```
+The getAdOfTheDay method attempts to subscribe to the iBeacon's channel utilizing the major and minor numbers observed by the viewController. However, it makes sure that the observer is connected to PubNub and that it hasn't already attempted to subscribe. If there is no connection when subscribeAttempt is true, it displays an error.
+
+```swift
+func pubnubClient(client: PubNub!, didReceiveMessage message: PNMessage!){
+	println("message received!")
+	self.pubStatus.text = "Deal Received"
+	if(needDeal) {
+		self.needDeal = false
+		self.deal.text = "\(message.message)"
+	}
+	PubNub.unsubscribeFromChannel(message.channel)
+}
+```
+Once the customer is subscribed to the channel, it should almost immediately receive a message from the brain. The didReceiveMessage delegate method is called when said message is received. It outputs the receipt to console and updates the status text. The method checks to make sure it hasn't already received a deal before updating the view. It then unsubscribes from the iBeacon's channel.
+
+```swift
+func pubnubClient(client: PubNub!, didConnectToOrigin origin: String!) {
+	println("connected to origin \(origin)")
+	connected = true
+	self.pubStatus.text = "connected"
+}
+
+func pubnubClient(client: PubNub!, didSubscribeOnChannels channels: NSArray!) {
+	println("Subscribed to channel(s): \(channels)")
+	self.pubStatus.text = "Subscribed"
+}
+
+func pubnubClient(client: PubNub!, didUnsubscribeOnChannels channels: NSArray!) {
+	println("Unsubscribed from channel(s): \(channels)")
+	self.pubStatus.text = "Unsubscribed"
+}
+
+func pubnubClient(client: PubNub!, subscriptionDidFailWithError error: PNError!){
+	println("Subscribe Error: \(error)")
+	self.pubStatus.text = "Subscription Error"
+}
+```
+These functions merely update the status label and print logging info to the console. The didConnectToOrigin delegate method switches the connected boolean to true, but the other methods could theoretically be removed without affecting the customer's functionality.
+
+With these four classes, 
 
 
