@@ -3,7 +3,7 @@
 
 Unlike most i-Products, iBeacon is not a physical device. Rather, it is a bluetooth protocol. It allows a device to transmit a small amount of information to another device when they are in close proximity (20m max) of each other. A good way to look at an iBeacon is as a lighthouse. An Observer first needs to know what direction to look in. Once an observer can see the light, he/she can determine color of the light and the frequency with which it rotates. They can also roughly determine how near/far they are from the source. However, with both iBeacons and lighthouses, the source and observer cannot communicate any further without an external technology. In the case of the lighthouse, a great candidate is a radio. In the case of iBeacons, a great cadidate is PubNub.
 
-By default, the only information an iBeacon can send to an observer is a set of two numbers (the major and minor numbers). The driving idea behind a smart iBeacon is that one usually wants a beacon to send an observer more information than this limited set. This is accomplished by using the two numbers provided by an iBeacon with PubNub to allow a device to act as the brains of the beacon. An observer uses the iBeacon's information to subscribe to a PubNub channel to which the "brain" device is already listening. That brain device can detect this subscription and initiate complex communication or trigger almost any sort of event.
+By default, the only information an iBeacon can send to an observer is a set of two numbers (the major and minor numbers). An observer can also determine its rough proximity (far = greater than 10m away, near = within a few meters, immediate = within a couple centimeters) to a beacon and act accordingly. The driving idea behind a smart iBeacon is that one usually wants a beacon to send an observer more information than this limited set. This is accomplished by using the two numbers provided by an iBeacon with PubNub to allow a device to act as the brains of the beacon. An observer uses the iBeacon's information to subscribe to a PubNub channel to which the "brain" device is already listening. That brain device can detect this subscription and initiate complex communication or trigger almost any sort of event.
 
 In this tutorial, I will demonstrate how to use an iDevice as both a smart iBeacon emitter and an iBeacon observer using the programming language Swift. For this example, we will pretend that we are shopkeepers trying to send daily deals to customers running the store's app. The "brain" is an ad server which publishes a deal whenever it detects a new device on the iBeacon's designated channel. When an observer device gets close enough to an iBeacon emitter, it uses the beacon's information to subscribe to the iBeacon's channel, receive the brain's ad, then leave the channel.
 
@@ -148,7 +148,7 @@ override func viewDidLoad() {
     brain.setup(self.serverStatus)
 }
 ```
-In the viedDidLoad() method, we define the beacon region using the previously defined UUID and the major/minor numbers you chose in the brain section above. The updateInterface() call will update our UILabels to reflect the region we defined. If your brain has a setup method, call it here.
+In the viedDidLoad() method, we define the beacon region using the previously defined UUID and the major/minor numbers you chose in the brain section above. The updateInterface call will update our UILabels to reflect the region we defined. If your brain has a setup method, call it here.
 
 ```swift
 func updateInterface(){
@@ -158,7 +158,7 @@ func updateInterface(){
     self.identity.text = self.region.identifier
 }
 ```
-Once again, updateInterface() simply uses the properties we defined for the region to update the user interface.
+Once again, updateInterface simply uses the properties we defined for the region to update the user interface.
 
 ```swift
 @IBAction func transmitBeacon(sender : UIButton) {
@@ -212,7 +212,7 @@ class ViewController: UIViewController, CLLocationManagerDelegate {
     var cstmr = Customer()
 }
 ```
-The UILabels are all used for the purpose of this demo to display information about the iBeacon our observer device detects. Similarly, one of the labels allows the PubNub delegate class (Customer) to update the status the connection to PubNub. We still have our iBeacon libraries and a customer object. We also still have a UUID object - make sure it's the same as the one used in the emitter.
+The UILabels are all used for the purpose of this demo to display information about the iBeacon our observer device detects. Similarly, one of the labels allows the PubNub delegate class (Customer) to update the status the connection to PubNub. It also has a label used to display the deal retreived from the iBeacon emitter. The found label is used to update the status of the observer component of this code (i.e. we've found a beacon, we're looking for one, etc.).  We still have our iBeacon libraries and a customer object. We also still have a UUID object - make sure it's the same as the one used in the emitter.
 
 ```swift
 override func viewDidLoad() {
@@ -223,7 +223,7 @@ override func viewDidLoad() {
 	cstmr.setup(deal, pubStatus: pubStatus)
 }
 ```
-In the viewDidLoad() method, we set the viewController as the delegate for the location manager. We also define a beacon region using the identifier and uuid we used with the emitter. We also call the setup method of our customer object (to be detailed in the next section).
+In the viewDidLoad method, we set the viewController as the delegate for the location manager. We also define a beacon region using the identifier and uuid we used with the emitter. We also call the setup method of our customer object (to be detailed in the next section).
 
 ```swift
 @IBAction func startDetection(sender : UIButton) {
@@ -234,9 +234,79 @@ In the viewDidLoad() method, we set the viewController as the delegate for the l
 	self.found.text = "Starting Monitor"
 }
 ```
-Once our connection to PubNub has been setup by the Customer.setup() method, we hit the start detection button. The action method it calls begins looking for an iBeacon and updates the status text accordingly. The if statmenet contains a location authorization request required in iOS 8 and later. However, calling it in an older iOS crashes the program. Thus, we need to check our iOS version and make sure we call it if and only if our device is running iOS 8 or later. 
+Once our connection to PubNub has been setup by the Customer.setup method, we hit the start detection button. The action method it calls begins looking for an iBeacon and updates the monitoring status (found) label accordingly. The if statmenet contains a location authorization request required in iOS 8 and later. However, calling it in an older iOS crashes the program. Thus, we need to check our iOS version and make sure we call it if and only if our device is running iOS 8 or later. 
 
 ```swift
+func locationManager(manager: CLLocationManager!, didStartMonitoringForRegion region: CLRegion!) {
+	self.found.text = "Scanning..."
+	manager.startRangingBeaconsInRegion(region as CLBeaconRegion) //testing line
+}
 
+func locationManager(manager: CLLocationManager!, didEnterRegion region: CLRegion!) {
+	manager.startRangingBeaconsInRegion(region as CLBeaconRegion)
+	self.found.text = "Possible Match"
+}
+    
+func locationManager(manager: CLLocationManager!, monitoringDidFailForRegion region: CLRegion!, withError error: NSError!) {
+	self.found.text = "Error :("
+	println(error)
+}
+
+func locationManager(manager: CLLocationManager!, didExitRegion region: CLRegion!) {
+	manager.stopRangingBeaconsInRegion(region as CLBeaconRegion)
+	reset()
+}
 ```
+Under normal iBeacon operation, one should only range beacons once one knows they are in a beacon's region. However, the only way to know this is for certain is to enter an iBeacon's region. This is inconvenient because an iBeacon can be detected from up to 20m away. The testing line is placed in the didStartMonitoringForRegion method so you don't have to leave the building every time you want to test your code. The didEnterRegion method begins ranging beacons whenever a user enters an iBeacon region. The monitoringDidFailForRegion prints errors to console. Finally, the didExitRegion method resets the state variables the customer class uses and stops beacon ranging. All of these methods update our status text accordingly.
+
+```swift
+func reset(){
+	self.found.text = "No"
+	self.uuid.text = "N/A"
+	self.major.text = "N/A"
+	self.minor.text = "N/A"
+	self.accuracy.text = "N/A"
+	self.rssi.text = "N/A"
+
+	cstmr.needDeal = true
+	cstmr.subscribeAttempt = true
+	self.deal.text = "Come on down to PubNub Cafe for a hot deal!"
+}
+```
+Our reset method is used when we want to reset the state variables used by the customer and the labels. (i.e. when we leave the beacon's region).
+
+```swift
+func locationManager(manager: CLLocationManager!, didRangeBeacons beacons: NSArray!, inRegion region: CLBeaconRegion!) {
+	if(beacons.count == 0) { return }
+	
+	var beacon = beacons.lastObject as CLBeacon
+	
+	if (beacon.proximity == CLProximity.Unknown) {
+		self.distance.text = "Unknown Proximity"
+		reset()
+		return
+	} else if (beacon.proximity == CLProximity.Immediate) {
+		self.distance.text = "Immediate"
+		cstmr.getAdOfTheDay(beacon.major, minor: beacon.minor)
+	} else if (beacon.proximity == CLProximity.Near) {
+		self.distance.text = "Near"
+		//reset()
+	} else if (beacon.proximity == CLProximity.Far) {
+		self.distance.text = "Far"
+	}
+	self.found.text = "Yes!"
+	self.uuid.text = beacon.proximityUUID.UUIDString
+	self.major.text = "\(beacon.major)"
+	self.minor.text = "\(beacon.minor)"
+	self.accuracy.text = "\(beacon.accuracy)"
+	self.rssi.text = "\(beacon.rssi)"
+    }
+```
+The didRangeBeacons delegate method is called when we have ranged a set of beacons who's regions we are currently occupying. It gives us an array of beacons, but for now we are only looking at one. The first line of the method exists because of our testing call to "startRangingBeacons" so we don't segfault when referencing an empty object. This might occur when we start the app out of range of any beacons. The rest of this method updates the labels to reflect current information about the beacon we are receiving data from. Officially, it can take up to 20 seconds to accurately display beacon information, but in practice it takes about 3. Right now, we hand control over to the customer object when our distance is immediate. It is easier to test the customer object when we reset our state at the "near" distance as opposed to when we leave the beacon's region.
+
+###The Customer
+Our customer class handles the observer's communication with the emitter beacon's brain. Once it receives control from the view controller, 
+
+
+
 
