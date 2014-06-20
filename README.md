@@ -13,7 +13,7 @@ In this example, the iOS device emitting the iBeacon will also host the ad serve
 ```swift
 class Brain: NSObject, PNDelegate {
     let config = PNConfiguration(forOrigin: "pubsub.pubnub.com", publishKey: "demo", subscribeKey: "demo", secretKey: nil)
-    let channel = PNChannel.channelWithName("minor:6major:9CompanyName", shouldObservePresence: true) as PNChannel
+    var channel = PNChannel()
     
     var serverStatus = UILabel()
     
@@ -25,15 +25,16 @@ class Brain: NSObject, PNDelegate {
 Our Brain class requires PNConfiguration and PNChannel objects to setup the communication channel for our iBeacon. The channel name should include the major and minor identification numbers you plan to transmit with your iBeacon. We also will use the serverStatus UILabel to provide updates to the user. Remember to indicate your class is a PNDelegate or else the setDelegate call in the next section will throw an error.
 
 ```swift
-func setup(serverLabel: UILabel) {
+func setup(serverLabel: UILabel, minor: NSNumber, major: NSNumber) {
 	self.serverStatus = serverLabel
 	PubNub.setDelegate(self)
 	PubNub.setConfiguration(self.config)
 	PubNub.connect()
+	channel = PNChannel.channelWithName("minor:\(minor)major:\(major)CompanyName", shouldObservePresence: true) as PNChannel
 	PubNub.subscribeOnChannel(self.channel)
 }
 ```
-The setup method is called by the UIViewController to trigger the brain to connect to the PubNub service and subscribe to the iBeacon's channel. The caller tells us which label to use for status updates in the upcoming delegate functions. The label must be assigned before the PubNub setup calls because it will be updated by delegate functions as setup occurs.
+The setup method is called by the UIViewController to trigger the brain to connect to the PubNub service and subscribe to the iBeacon's channel. The caller tells us which label to use for status updates in the upcoming delegate functions. The label must be assigned before the PubNub setup calls because it will be updated by delegate functions as setup occurs. The setup function also receives a major and minor number. These numbers will be broadcast by the emitter with which the brain is associated.
 
 ```swift
 func pubnubClient(client: PubNub!, didConnectToOrigin origin: String!) {
@@ -85,6 +86,7 @@ If you wanted to get rid of the logging/label updating, your one beacon brain co
 class Server: NSObject, PNDelegate {
     let config = PNConfiguration(forOrigin: "pubsub.pubnub.com", publishKey: "demo", subscribeKey: "demo", secretKey: nil)
     let channel = PNChannel.channelWithName("minor:6major:9CompanyName", shouldObservePresence: true) as PNChannel
+    //because you decide on major/minor numbers anyway, you can hardcode them into the channel.
     
     var serverStatus = UILabel()
     
@@ -145,10 +147,10 @@ override func viewDidLoad() {
     self.region = CLBeaconRegion(proximityUUID: uuidObj, major: 9, minor: 6, identifier: "com.pubnub.test")
     updateInterface()
     
-    brain.setup(self.serverStatus)
+    brain.setup(self.serverStatus, minor: self.region.minor, major: self.region.major)
 }
 ```
-In the viedDidLoad() method, we define the beacon region using the previously defined UUID and the major/minor numbers you chose in the brain section above. The updateInterface call will update our UILabels to reflect the region we defined. If your brain has a setup method, call it here.
+In the viedDidLoad() method, we define the beacon region using the previously defined UUID and the major/minor numbers which will be broadcast by the brain. The updateInterface call will update our UILabels to reflect the region we defined.
 
 ```swift
 func updateInterface(){
@@ -380,8 +382,6 @@ func pubnubClient(client: PubNub!, subscriptionDidFailWithError error: PNError!)
 	self.pubStatus.text = "Subscription Error"
 }
 ```
-These functions merely update the status label and print logging info to the console. The didConnectToOrigin delegate method switches the connected boolean to true, but the other methods could theoretically be removed without affecting the customer's functionality.
+These functions merely update the status label and print logging info to the console. The didConnectToOrigin delegate method switches the connected boolean to true, but the other methods could theoretically be removed without affecting the class' functionality.
 
-With these four classes, 
-
-
+Between these four classes, you should have a working iBeacon capable of complex communication with its observers. 
