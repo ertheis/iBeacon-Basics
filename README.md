@@ -86,7 +86,7 @@ If you wanted to get rid of the logging/label updating, your one beacon brain co
 class Server: NSObject, PNDelegate {
     let config = PNConfiguration(forOrigin: "pubsub.pubnub.com", publishKey: "demo", subscribeKey: "demo", secretKey: nil)
     let channel = PNChannel.channelWithName("minor:6major:9CompanyName", shouldObservePresence: true) as PNChannel
-    //because you decide on major/minor numbers anyway, you can hardcode them into the channel.
+    //because you decide on major/minor numbers anyway, you can hardcode them into the channel string.
     
     var serverStatus = UILabel()
     
