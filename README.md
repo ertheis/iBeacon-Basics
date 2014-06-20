@@ -185,3 +185,58 @@ This delegate method is called when the device's bluetooth changes state (includ
 
 Now we've completed the code for the emitter device. Before you test it, remember to make sure your device has an internet connection and that it's bluetooth hardwear is on. Another note is that iBeacons only work on devices equipped with bluetooth 4.0 or higher. In the app, merely wait for the server status to display "ready to transmit" then press the transmit button. Voila, you have a working smart iBeacon emitter.
 
+###Observing the Signal
+Now that we've made an iBeacon emitter, we need to create our observer. The observer follows a model similar to the emitter. The viewController handles the iBeacon's detection while another class (which we will call the customer) receives control once a beacon's information is harvested. To create the observer, we utilize the CoreLocation and CoreBluetooth libraries.
+
+```swift
+class ViewController: UIViewController, CLLocationManagerDelegate {
+    //our status label's referencing outlets
+    @IBOutlet var found : UILabel
+    @IBOutlet var uuid : UILabel
+    @IBOutlet var major : UILabel
+    @IBOutlet var minor : UILabel
+    @IBOutlet var accuracy : UILabel
+    @IBOutlet var distance : UILabel
+    @IBOutlet var rssi : UILabel
+    @IBOutlet var deal : UILabel
+    @IBOutlet var pubStatus : UILabel
+    
+    //our UUID, make sure it's the same as the one you used for the emitter above
+    let uuidObj = NSUUID(UUIDString: "0CF052C2-97CA-407C-84F8-B62AAC4E9020")
+    
+    //the core library objects used to detect iBeacons
+    var region = CLBeaconRegion()
+    var manager = CLLocationManager()
+    
+    //our customer object
+    var cstmr = Customer()
+}
+```
+The UILabels are all used for the purpose of this demo to display information about the iBeacon our observer device detects. Similarly, one of the labels allows the PubNub delegate class (Customer) to update the status the connection to PubNub. We still have our iBeacon libraries and a customer object. We also still have a UUID object - make sure it's the same as the one used in the emitter.
+
+```swift
+override func viewDidLoad() {
+	super.viewDidLoad()
+	manager.delegate = self
+	region = CLBeaconRegion(proximityUUID: uuidObj, identifier: "com.pubnub.test")
+	
+	cstmr.setup(deal, pubStatus: pubStatus)
+}
+```
+In the viewDidLoad() method, we set the viewController as the delegate for the location manager. We also define a beacon region using the identifier and uuid we used with the emitter. We also call the setup method of our customer object (to be detailed in the next section).
+
+```swift
+@IBAction func startDetection(sender : UIButton) {
+	if(UIDevice.currentDevice().systemVersion.substringToIndex(1).toInt() >= 8){
+		self.manager.requestAlwaysAuthorization()
+	}
+	self.manager.startMonitoringForRegion(self.region)
+	self.found.text = "Starting Monitor"
+}
+```
+Once our connection to PubNub has been setup by the Customer.setup() method, we hit the start detection button. The action method it calls begins looking for an iBeacon and updates the status text accordingly. The if statmenet contains a location authorization request required in iOS 8 and later. However, calling it in an older iOS crashes the program. Thus, we need to check our iOS version and make sure we call it if and only if our device is running iOS 8 or later. 
+
+```swift
+
+```
+
